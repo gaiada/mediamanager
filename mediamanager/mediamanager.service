@@ -1,0 +1,17 @@
+[Unit]
+Description=Media Manager Flask Application
+After=network.target
+
+[Service]
+# Define the path variables
+Environment="APP_DIR=/opt/mediamanager"
+Environment="VIRTUAL_ENV_DIR=/opt/mediamanager/myenv"
+WorkingDirectory=/opt/mediamanager
+ExecStart=/opt/mediamanager/myenv/bin/python /opt/mediamanager/app.py
+Restart=always
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
+

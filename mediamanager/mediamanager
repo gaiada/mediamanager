@@ -1,0 +1,81 @@
+#!/bin/sh
+# /etc/init.d/mediamanager
+# chkconfig: 2345 20 80
+# description: Media Manager Flask Application
+
+### BEGIN INIT INFO
+# Provides:          mediamanager
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Media Manager Flask Application
+### END INIT INFO
+
+# Define the path variables
+APP_DIR=/opt/mediamanager
+VIRTUAL_ENV_DIR=$APP_DIR/myenv
+APP_PATH=$APP_DIR/app.py
+LOGFILE=/var/log/mediamanager.log
+PIDFILE=/var/run/mediamanager.pid
+
+start() {
+    echo "Starting Media Manager..."
+    cd $APP_DIR
+    source $VIRTUAL_ENV_DIR/bin/activate
+    nohup $VIRTUAL_ENV_DIR/bin/python $APP_PATH > $LOGFILE 2>&1 &
+    echo $! > $PIDFILE
+    echo "Media Manager started."
+}
+
+stop() {
+    echo "Stopping Media Manager..."
+    if [ -f $PIDFILE ]; then
+        PID=$(cat $PIDFILE)
+        kill $PID
+        rm $PIDFILE
+        echo "Media Manager stopped."
+    else
+        echo "Media Manager is not running."
+    fi
+}
+
+status() {
+    if [ -f $PIDFILE ]; then
+        PID=$(cat $PIDFILE)
+        if ps -p $PID > /dev/null; then
+            echo "Media Manager is running."
+        else
+            echo "Media Manager is not running."
+        fi
+    else
+        echo "Media Manager is not running."
+    fi
+}
+
+restart() {
+    stop
+    start
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        restart
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
+

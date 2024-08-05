@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Media Management</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    
+ 
+    <style>
+	.file-div {
+		border: 1px solid #ccc;
+		min-width: 200px;
+	}
+	.file-div:hover {
+		background-color:#ddf;
+	}
+	.actions{
+		visibility:hidden;
+	}
+
+	.selected .actions {
+		visibility:visible;
+
+	}
+	.file-path {
+		visibility:hidden;
+	}
+	.selected {
+		background-color:#fff;
+
+        border-width: 4px;
+	border-color: #99f;	
+
+	}
+
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 576px) {
+            body {
+                font-size: 14px;
+            }
+	#directory-area {
+		max-height:200px;
+	}
+            .navbar {
+                padding: 10px;
+            }
+
+            .form-inline {
+                flex-wrap: nowrap;
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .form-inline input {
+                width: 50%;
+                min-width: 100px;
+            }
+
+            .form-inline .btn {
+                width: 45%;
+            }
+
+            .form-inline .btn > span {
+                display: none;
+            }
+
+            .form-inline .btn i {
+                font-size: 20px;
+            }
+        }
+
+@keyframes smoothFade {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.fade-in-out {
+    animation: smoothFade 2s infinite;
+    animation-timing-function: ease-in-out;
+}
+
+
+        .modal-content {
+            border-radius: 15px;
+        }
+        .modal-header,
+        .modal-footer {
+            background-color: #f8f9fa;
+        }
+        .modal-title {
+            color: #007bff;
+        }
+        .media-content {
+            max-width: 100%;
+            height: auto;
+        }
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .control-buttons button {
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .control-buttons button:hover {
+            background-color: #0056b3;
+        }
+
+.icon-small {
+  font-size: 1em; 
+  /* Adjust the font size to make the icon smaller */
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  text-align: center; /* Ensure the icon is centered */
+}
+
+
+    </style>
+
+
+
+
+
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+
+
+    <script>
+
+
+        function toMD5(str) {
+            const hash = CryptoJS.MD5(str).toString(CryptoJS.enc.Hex); // MD5 hash to hexadecimal string
+            return hash;
+        }
+
+	function toggletrash(){
+		if($('#toggletrash').hasClass('fa-trash') == true){
+			$('#toggletrash').removeClass('fa-trash');
+			$('#toggletrash').addClass('fa-home');
+			$('#normalpath').text($('#currentdir').text());
+			$('#search-input').val($('#trashpath').text());
+			$('#currentdir').text($('#trashpath').text());
+			search_directory();
+		} else {
+			$('#toggletrash').removeClass('fa-home');
+			$('#toggletrash').addClass('fa-trash');
+			
+			$('#search-input').val($('#normalpath').text());
+			$('#trashpath').text($('#currentdir').text());
+			$('#currentdir').text($('#normalpath').text());
+			search_directory();
+		}
+	}
+
+
+	function loadsettings(){
+
+		$.post("/settings", { action : 'get' })
+		.done(function(response) {
+			settings = response;
+			$('body').data('sysset',JSON.stringify(response));
+			$('#settingsModalSourceDirectory').val(response['source_path']);
+			$('#search-input').val(response['source_path']);
+			$('#currentdir').val(response['source_path']);
+			$(document).ready(function() {
+				$('#trashpath').text(response['deleted_path']);
+				$('#settingsModalSourceDirectory').val(response['source_path']);
+				$('#search-input').val($('#settingsModalSourceDirectory').val());
+				$('#currentdir').val($('#settingsModalSourceDirectory').val());
+				$('#settingsModalGarbageDirectory').val(response['deleted_path']);
+				if (response['allow_register'] === 'true') {
+					$('#settingsModalAllowRegister').prop('checked', true);
+				} else {
+					$('#settingsModalAllowRegister').prop('checked', false);
+				}
+
+
+
+				search_directory();
+
+
+			});
+		});
+
+	}
+
+
+loadsettings();
+
+
+$(document).ready(function() {
+    $('#search-input').on('keypress', function(event) {
+        if (event.which === 13) {
+            search_directory();
+        }
+    });
+});
+
+
+
+        $(document).ready(function() {
+
+
+		$('#content-area').parent().hide();
+
+		$('#settingsModal').on('hidden.bs.modal', function () {
+            	$('.modal-backdrop').remove();
+            	$('body').removeClass('modal-open');
+
+        });
+
+
+
+
+
+$("#search-input").val($("#currentdir").text().replace(/\/{2,}/g, "/")     );
+$('#currentdir').text($('#search-input').val());
+
+
+
+function formatFileSize(sizeInBytes) {
+    if (sizeInBytes === null) {
+        return "pending";
+    }
+
+    const units = ["bytes", "KB", "MB", "GB", "TB"];
+    let unitIndex = 0;
+
+    while (sizeInBytes >= 1024 && unitIndex < units.length - 1) {
+        sizeInBytes /= 1024;
+        unitIndex++;
+    }
+
+    return `${sizeInBytes.toFixed(2)} ${units[unitIndex]}`;
+}
+
+
+
+
+
+
+
+
+$("body").append(`
+    <div id="custom-tooltip" style="
+        display: none;
+        position: absolute;
+        background-color: #000; /* Black background */
+        color: #fff; /* White text */
+        border: 1px solid #333; /* Dark border */
+        border-radius: 8px; /* Rounded corners */
+        padding: 10px; /* Padding for spacing */
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); /* Drop shadow */
+        z-index: 1000;
+    "></div>
+`);
+
+// Function to truncate and maintain file extension
+function truncateFileName(name) {
+    if (name.length > 30) {
+        var extIndex = name.lastIndexOf(".");
+        var extension = name.slice(extIndex); // File extension
+        var truncatedPart = name.slice(0, 20 - extension.length); // 27 - 3 for ellipsis
+        return truncatedPart + "--" + extension;
+    }
+    return name;
+}
+
+
+
+$("#search-button").click(function() {
+	search_directory();
+
+});
+
+
+
+
+        });
+    </script>
+
+
+    <style>
+        .settingsModal-content {
+            border-radius: 10px;
+            border: none;
+        }
+        .settingsModal-header {
+            background-color: #00ccff;
+            color: white;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border: none;
+        }
+        @media (max-width: 768px) {
+            .settingsModal-dialog {
+                max-width: 90%;
+            }
+        }
+
+
+
+	.retain .showing {
+		visibility:visible;
+		background-color: #5fa;
+	}
+
+
+	.retain {
+		background-color: #5fa;
+	}
+
+
+
+
+
+    </style>
+
+
+
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light" style="border-radius: 15px;">
+        <a class="navbar-brand" href="#">Media Management</a>
+	<button type="button" class="btn btn-light" style="left:0px" data-toggle="modal" data-target="#settingsModal"><i class="fa fa-gear"></i> </button>
+	<button id="showretain" type="button" class="btn btn-light" style="left:0px" onclick="showretain()"><i class="fa fa-eye "></i> </button>
+	<button id="showtrashbin" type="button" class="btn btn-light" style="left:0px" onclick='toggletrash()' "><i id='toggletrash' class="fa fa-trash "></i> </button>
+	<button type="button" class="btn btn-light" style="left:0px" onclick="invalidate_cache($('#currentdir').text())"><i class="fa fa-refresh"></i> </button>
+
+
+        <div class="ml-12">
+	
+            <span>Directory:</span>
+            <span id="currentdir">/mnt/c/Users/Bel/Desktop</span> <!-- Displaying the current directory -->
+        </div>
+
+        <div class="form-inline">
+<div class="input-group mb-12">
+	<div class="input-group-append">
+       	    <span class="form-control btn btn-light" onclick="navigate(getParentDirectory($('#currentdir').text()),false)">.. </span>
+	</div>
+	<input class="form-control mr-2" id="search-input" type="search" placeholder="Search"> <!-- Search input -->
+	<div class="input-group-append">
+		<button class="form-control btn btn-outline-success" id="search-button" style="min-width:50px"><i class="fas fa-search"></i><span> Search</span></button> 
+	</div>
+</div>
+            <button class="btn btn-danger ml-3" onclick="window.location.href='/logout'"><i class="fas fa-door-open"></i><span> Logout</span></button>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+
+
+		<div class="card mt-3" id="loading-area"></div>
+
+                
+		<div class="card mt-3" style="border: none; background-color: #ffffff;">
+		&nbsp;	<span style="margin-top:5px;font-weight:bold;font-family: sans-serif;color:#555">Directories</span>
+                	<div id="directory-area" style="border:1px solid rgba(0,0,0,.125);border-radius: 15px;margin-top:5px;background-color:#fff8ff;display:flex;flex-wrap:wrap;max-height:600px;overflow:hidden;overflow-y:auto ">
+			</div>
+                </div>
+
+
+
+
+
+
+		<!-- Content Area -->
+		<div class="card mt-3" style="border:none; background-color: #ffffff;">
+		&nbsp;	<span style="margin:0px;font-weight:bold;font-family: sans-serif;color:#555">Files</span>
+                <div id="content-area" class="card mt-3" style="border-radius: 15px; background-color: #f0f8ff;max-height:600px;overflow:hidden;overflow-y:auto">
+                    <div class="card-body">
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+    <script>
+
+        function processData(data) {
+		$('#lastupdate').text(data.time);
+		if (data.files.length > 0){
+			$('#querytimeout').text('5000');
+		} else {
+			var newtimeout = 5000 + parseInt($('#querytimeout').text(),10);
+			if (newtimeout > 30000) 
+				newtimeout = 30000;
+			$('#querytimeout').text(newtimeout).trigger('textchange');
+			
+		}
+
+
+            data.files.forEach(item => {
+		if (item.retain == 'retain' ){
+			 $('#'+toMD5(item.name)).addClass('retain');
+		} else {
+			 $('#'+toMD5(item.name)).removeClass('retain');
+		}
+                $('.file-icon-'+toMD5(item.name)).html(`<img src="${item.mediacache}" style="max-width: 100px; max-height: 100px;" alt="Image Thumbnail">`);
+            });
+        }
+
+
+
+        function processDir(data) {
+            data.files.forEach(item => {
+		    const siz  = item.size || 0;
+                    $('#'+toMD5(item.name)+' .file-size').html(formatFileSize(siz));
+
+
+
+
+                    $('#'+toMD5(item.name)+' .file-images').html('<i class="pending fas fa-image fa-2x icon-small"></i>&nbsp;&nbsp;&nbsp;' + item.images);
+		    $('#'+toMD5(item.name)+' .file-videos').html('<i class="pending fas fa-video fa-2x icon-small"></i>&nbsp;&nbsp;&nbsp;' + item.videos);
+
+            });
+        }
+
+
+
+
+
+function openInNewWindow(url) {
+    window.open(url, '_blank');
+}
+
+
+function navigate(file,elemento){
+	var newdir = file;
+	newdir.replace(/\/{2,}/g, "/");
+
+	var filepath = $('#currentdir').text()+'/'+newdir;
+	if (isFile(filepath)){
+
+		if ( (elemento == false) || ($(elemento).hasClass('selected'))){
+		filepath = filepath.replace(/^\/+/, ''); // Remove preceding slashes
+		loadFile(filepath);
+
+		}else{
+			$('.selected').removeClass('selected');
+			$(elemento).addClass('selected');
+
+		}
+	} else {
+
+
+		if ( (elemento == false) || ($(elemento).hasClass('selected'))){
+	
+		        $("#content-area").show();
+		        const curdir = $('#currentdir').text();
+			if (newdir.startsWith('/')){
+				$('#search-input').val(newdir.replace(/\/{2,}/g, "/"));
+				$('#currentdir').text($('#search-input').val());
+			} else
+			{
+		        	const newd = curdir+'/'+newdir;
+				newd.replace(/\/{2,}/g, "/");
+				$('#search-input').val(newd.replace(/\/{2,}/g, "/"));
+				$('#currentdir').text($('#search-input').val());
+			}
+		        search_directory();
+			window.scrollTo(0, 0);
+		} else {
+	
+			$('.selected').removeClass('selected');
+			$(elemento).addClass('selected');
+	
+		}
+	}
+
+}
+
+
+
+function getParentDirectory(path) {
+    if (!path) throw new Error("Invalid path");
+
+    // Normalize to forward slashes, split into segments, remove last part
+    const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
+    segments.pop(); // Remove last segment
+
+    // Join the remaining segments, ensuring leading slash
+    return '/' + segments.join('/');
+}
+
+
+
+
+
+
+
+
+
+function formatFileSize(sizeInBytes) {
+    if (sizeInBytes === null) {
+        return "pending"; // Default size for directories
+    }
+
+    const units = ["bytes", "KB", "MB", "GB", "TB"];
+    let unitIndex = 0;
+
+    while (sizeInBytes >= 1024 && unitIndex < units.length - 1) {
+        sizeInBytes /= 1024;
+        unitIndex++;
+    }
+
+    return `${sizeInBytes.toFixed(2)} ${units[unitIndex]}`;
+}
+
+
+
+
+
+
+function getParentDirectory(path) {
+    if (!path) throw new Error("Invalid path");
+
+    const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
+    segments.pop(); // Remove last segment
+
+    return '/' + segments.join('/');
+}
+
+
+function invalidate_cache(filepath){
+	 							     
+    $.post("/invalidate", { path: filepath })
+
+        .done(function(response) {
+		search_directory();
+	});
+}
+
+
+
+
+
+function search_directory(){
+
+    var searchValue = $("#search-input").val();
+    $("#currentdir").text(searchValue);
+
+   $('#loading-area').html('<div class="card justify-content-center"><div><i class="fa fa-cog fa-spin" style="font-size:24px"></i></div>Loading&nbsp '+searchValue+'&nbsp</div>');
+                $('#loading-area').show();
+    		$("#search-input").focus();
+                $('#content-area').show();
+                $('#directory-area').html('');
+                $('#directory-area').parent().hide();
+                $('#content-area').parent().hide();
+		
+    $.post("/start", { directory: $("#currentdir").text() })
+
+        .done(function(response) {
+            if (response.files) {  // Check if 'files' is present in the response
+		$('#querytimeout').text('5000');
+
+                $('#loading-area').hide();
+                $('#content-area').show();
+                $('#content-area').parent().show();
+                $('#content-area').html('');
+                $('#directory-area').parent().show();
+		    var newContent = '<div style="display: flex; flex-wrap: wrap;">';
+
+                response.files.forEach(function(file) {
+                    var readableSize = formatFileSize(file.size); // Convert size to human-readable
+                    var iconContent = ''; // Variable to store content for icon
+			if (file.retain == 'retain'){
+			       if ($('#showretain').hasClass('btn-success') != true){
+						       return;
+			       }
+		       }
+                    if (file.type === "directory") {
+                        // Directory icon
+                        iconContent = `<i class="fas fa-folder fa-2x"></i>`;
+                    } else if (file.type === "image") {
+                        if ((file.cachepath)&& (file.cachepath != 'static/thumbnails/pending') &&  (file.cachepath != 'pending')) {
+                        iconContent = `<img src="${file.cachefile}" style="max-width: 100px; max-height: 100px;" alt="Image Thumbnail">`;
+                        } else {
+                            iconContent = `<i class="pending fas fa-image fa-2x"></i>`;
+                        }
+                    } else if (file.type === "video") {
+                        if ((file.cachepath)&& (file.cachepath != 'static/thumbnails/pending')) {
+                            iconContent = `<img src="${file.cachefile}" style="max-width: 100px; max-height: 100px;" alt="Video Thumbnail">`;
+                        } else {
+                            iconContent = `<i class="pending fas fa-video fa-2x"></i>`;
+                        }
+                    } else {
+                        iconContent = `<i class="fas fa-file fa-2x"></i>`;
+                    }
+
+                    var truncatedName = truncateFileName(file.name);
+
+			var newitem = '';
+
+                    if (file.type === "directory") {
+
+	        	var filetomove = $('#currdir').text()+'/'+file.name;
+			    filetomove.replace(/\/{2,}/g, "/");
+			    var actualdirectory = $('#currentdir').text();
+			    var retainclass="";
+			    if (file.retain == 'retain') {
+			    retainclass="retain";
+			    }
+
+
+
+
+		var	actions = `<div class="actions">
+				    <button class="btn btn-danger" onclick="event.stopPropagation();prepare_to_remove('${actualdirectory}/${filetomove}')">Remove</button>
+				    &nbsp;&nbsp;<button id="retain-`+toMD5(file.name)+`" class="btn btn-success" onclick='event.stopPropagation();Retain("`+toMD5(file.name)+`")'>Retain</button>
+                        </div>`;
+
+			if ( $('#toggletrash').hasClass('fa-home')){
+				actions = '';	
+			}
+
+
+
+
+
+
+
+
+
+			newitem += `
+				    <div id="`+toMD5(file.name)+`" class="file-div rounded p-2 ${retainclass}" style="margin: 10px; text-align: center; flex: 1 0 100px;" onclick="navigate('${file.name}',this)">
+                            <div class="file-icon-`+toMD5(file.name)+`">${iconContent}</div> <!-- Icon content (larger thumbnail or default) -->
+                            <div class="file-name" data-full-name="${file.name}" style="word-wrap: break-word;">${truncatedName}</div>
+                            <div class="file-size">${readableSize}</div> <!-- Display file size -->
+                            <div class="file-path">${file.item_path}</div> <!-- Display file size -->
+			    <div class="file-images"> <i class="pending fas fa-image fa-2x icon-small"></i>&nbsp;&nbsp;&nbsp;${file.images}</div> <!-- Display file size -->
+			    <div class="file-videos"> <i class="pending fas fa-video fa-2x icon-small"></i>&nbsp;&nbsp;&nbsp;${file.videos}</div> <!-- Display file size -->
+
+			${actions}
+
+
+
+
+                        </div>
+                    `;
+
+
+
+				$('#directory-area').append(newitem);
+		    } else {
+	        	var filetomove = $('#currentdir').text()+'/'+file.name;
+			    filetomove.replace(/\/{2,}/g, "/");	
+			    var actualdirectory = $('#currentdir').text();
+			    var retainclass="";
+			    if (file.retain == 'retain') {
+			    retainclass="retain";
+			    }
+
+
+
+			var actions =`<div class="actions">
+				    <button class="btn btn-danger" onclick="event.stopPropagation();prepare_to_remove('${filetomove}')">Remove</button>
+				    &nbsp;&nbsp;<button id="retain-`+toMD5(file.name)+`" class="btn btn-success" onclick='event.stopPropagation();Retain("`+toMD5(file.name)+`")'>Retain</button>
+                        </div>`;
+
+			if ( $('#toggletrash').hasClass('fa-home')){
+				actions = '';	
+			}
+
+
+
+
+			newitem += `
+				    <div id="`+toMD5(file.name)+`" class="file-div rounded p-2 ${retainclass}" style="margin: 10px; text-align: center; flex: 1 0 100px;" onclick="navigate('${file.name}',this)">
+                            <div class="file-icon-`+toMD5(file.name)+`">${iconContent}</div> <!-- Icon content (larger thumbnail or default) -->
+                            <div class="file-name" data-full-name="${file.name}" style="word-wrap: break-word;">${truncatedName}</div>
+                            <div class="file-size">${readableSize}</div> <!-- Display file size -->
+
+				${actions}
+
+
+                        </div>
+                    `;
+
+
+                    newContent += newitem;
+		    }
+                });
+
+                newContent += "</div>"; // Close the flex container
+
+                $("#content-area").html(newContent);
+
+                // Add hover event for displaying full name
+                $(".file-name").hover(
+                    function (e) {
+                        var fullName = $(this).attr("data-full-name");
+                        $("#custom-tooltip").text(fullName).css({
+                            display: "block",
+                            left: e.pageX + 10,
+                            top: e.pageY + 10,
+                        }).fadeIn(100); // Fade-in effect for quicker appearance
+                    },
+                    function () {
+                        $("#custom-tooltip").fadeOut(100); // Fade-out when hovering stops
+                    }
+                );
+            } else {
+                console.warn("No 'files' property found in the response.");
+            }
+        })
+        .fail(function(jqXHR, textStatus, errorThrown) {
+            console.error("Request failed:", textStatus, errorThrown);
+            alert("Something went wrong. Please try again.");
+        })
+        .always(function() {
+            console.log("Request completed.");
+	
+
+	if ($('#directory-area').html() == ''){
+		$('#directory-area').parent().hide();
+	} else {
+
+		$('#directory-area').parent().show();
+	}
+
+
+
+
+
+	if ( $('#content-area .file-div').length  < 1   ){
+		$('#content-area').hide();
+	} else {
+		$('#content-area').show();
+
+	}
+
+
+
+
+
+
+        });
+
+}
+
+
+function Retain(filemd5){
+filename = $('#'+filemd5+ ' .file-name').attr('data-full-name');
+var fname = filename.replace(/\/{2,}/g, "/");	
+filename = fname;
+
+
+filename = filename.replace(/\n/g, '')
+																											      
+filepath = $('#currentdir').text()+'/'+filename;
+var fpath = filepath.replace(/\/{2,}/g, "/");	
+filepath = fpath;
+$.post("/retain", { path: filepath })
+.done(function(response) {
+    if (response.retain == 'retain'){
+    			if ($('#showretain').hasClass('btn-success') != true){
+				$('#'+filemd5).remove(); 
+		    	} else {
+				$('#'+filemd5).addClass('retain'); 
+			}
+    } else {
+			if ($('#showretain').hasClass('btn-success') == true){
+				$('#'+filemd5).removeClass('retain'); 
+		    	}
+   }
+ });
+
+
+ }
+
+
+function truncateFileName(name) {
+    if (name.length > 30) {
+        var extIndex = name.lastIndexOf(".");
+        var extension = name.slice(extIndex); // File extension
+        var truncatedPart = name.slice(0, 20 - extension.length); // 27 - 3 for ellipsis
+        return truncatedPart + "--" + extension;
+    }
+    return name;
+}
+
+
+
+
+
+function selectFile(file){
+	alert( $(file).html());
+	
+}
+
+
+
+
+
+function convertToBytes(sizeText) {
+    // Extract numerical part and unit part from the file size text
+    const sizePattern = /^([\d.]+)\s*(KB|MB|GB|TB)?$/i;
+    const match = sizePattern.exec(sizeText);
+
+    if (match) {
+        const size = parseFloat(match[1]); // The numerical part
+        const unit = match[2] ? match[2].toUpperCase() : 'B'; // The unit part, default to bytes
+
+        // Convert to bytes based on the unit
+        switch (unit) {
+            case 'KB':
+                return size * 1024; // 1 KB = 1024 bytes
+            case 'MB':
+                return size * 1024 * 1024; // 1 MB = 1024 * 1024 bytes
+            case 'GB':
+                return size * 1024 * 1024 * 1024; // 1 GB = 1024 * 1024 * 1024 bytes
+            case 'TB':
+                return size * 1024 * 1024 * 1024 * 1024; // 1 TB = 1024^4 bytes
+            default:
+                return size; // If no unit or unknown, assume bytes
+        }
+    }
+
+    return 0; // Return 0 if the pattern doesn't match
+}
+
+function sortByFileSize(parentId, ascending = false) {
+    const $parent = $(`#${parentId}`);
+    const $fileDivs = $parent.find('.file-div');
+
+    const sortedFileDivs = $fileDivs.sort((a, b) => {
+        const sizeA = convertToBytes($(a).find('.file-size').text());
+        const sizeB = convertToBytes($(b).find('.file-size').text());
+
+        if (ascending) {
+            return sizeA - sizeB; // Ascending order
+        } else {
+            return sizeB - sizeA; // Descending order
+        }
+    });
+
+    $parent.empty(); // Clear the parent container
+    $parent.append(sortedFileDivs); // Re-append sorted elements
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        function queryServer() {
+            const url = '/query'; // The URL to query
+            const postData = { directory: $('#currentdir').text(),lastupdate: $('#lastupdate').text() }; 
+                const pending = $('.pending')
+                if (pending.length > 0) {
+            $.post(url, postData, function(response) {
+                    processData(response); // Process the response data
+            }).fail(function() {
+                console.error('Failed to query the server');
+            });
+                } else {
+//                        console.log('no pending elements');
+                }
+
+        }
+
+
+        function queryServerDir() {
+            const url = '/querydir'; 
+            const postData = { directory: $('#currentdir').text() }; 
+		const count = $(".file-size:contains('pending')").length;
+                if (count > 0) {
+            $.post(url, postData, function(response) {
+                    processDir(response); 
+            }).fail(function() {
+                console.error('Failed to query the server');
+            });
+                } else {
+              //          console.log('no pending elements');
+                }
+
+	    sortByFileSize('directory-area',false);
+
+        }
+
+
+
+
+
+$(document).ready(function() {
+    var queryInterval;
+    var queryDirInterval;
+
+    function startTicker() {
+        var timeoutinterval = parseInt($('#querytimeout').text(), 10);
+
+        if (queryInterval) {
+            clearInterval(queryInterval);
+        }
+        if (queryDirInterval) {
+            clearInterval(queryDirInterval);
+        }
+
+        queryInterval = setInterval(queryServer, parseInt($('#querytimeout').text(), 10));
+        queryDirInterval = setInterval(queryServerDir, parseInt($('#querytimeout').text(), 10));
+    }
+
+    $("#content-area").hide();
+    $("#directory-area").parent().hide();
+
+    startTicker();
+
+    $('#querytimeout').on('textchange', function() {
+        startTicker();
+    });
+});
+
+
+
+
+
+		function isFile(filepath) {
+		    return /\.[a-zA-Z0-9]{2,4}$/.test(filepath);
+		}
+
+
+
+
+
+    </script>
+
+
+
+
+
+
+    <div class="modal fade" id="mediaModal" tabindex="-1" role="dialog" aria-labelledby="mediaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mediaModalLabel">Media Viewer</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="mediaContainer"></div>
+                </div>
+                <div class="modal-footer">
+                    <div class="control-buttons">
+                        <button id="downloadBtn">Download</button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadFile(filePath) {
+		const fileP = filePath;
+		 filePath = 'serve?filepath='+filePath;
+            const mediaContainer = document.getElementById('mediaContainer');
+            const extension = filePath.split('.').pop().toLowerCase();
+
+            mediaContainer.innerHTML = ''; 
+            let mediaElement;
+
+            if (['mp4', 'webm', 'ogg','mpg','mpeg','mkv'].includes(extension)) {
+                // Video
+                mediaElement = document.createElement('video');
+                mediaElement.src = filePath;
+                mediaElement.controls = true;
+                mediaElement.classList.add('media-content');
+            } else if (['mp3', 'wav', 'ogg'].includes(extension)) {
+                // Audio
+                mediaElement = document.createElement('audio');
+                mediaElement.src = filePath;
+                mediaElement.controls = true;
+                mediaElement.classList.add('media-content');
+            } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp','svg'].includes(extension)) {
+                // Image
+                mediaElement = document.createElement('img');
+                mediaElement.src = filePath;
+                mediaElement.classList.add('media-content');
+            } else if (['txt', 'html', 'md','json','csv','tsv','php','py'].includes(extension)) {
+                // Text
+
+                const textWrapper = document.createElement('iframe');
+		textWrapper.src = filePath;
+		textWrapper.width = '100%';
+		textWrapper.height = '400px';
+		mediaContainer.appendChild(textWrapper);
+
+            }
+
+            if (mediaElement) {
+                mediaContainer.appendChild(mediaElement);
+            }
+
+            $("#downloadBtn").off('click');
+            $("#downloadBtn").click(function() {
+		    openInNewWindow(filePath);
+	    });
+            $('#mediaModal').modal('show');
+        }
+    </script>
+
+
+
+
+
+
+<div class="modal fade" id="fileMoveModal" tabindex="-1" role="dialog" aria-labelledby="fileMoveModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fileMoveModalLabel">Move File</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>File to move: <span id="file-path-span"></span></p>
+                <div class="form-group">
+                    <label for="destination-input">Destination</label>
+                    <input type="text" class="form-control" id="destination-input" placeholder="Enter destination path">
+                </div>
+                <div id="move-result" style="display: none;">
+                    <h5>Move Result</h5>
+                    <p id="status-span"></p>
+                    <p id="newfile-span"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="move_file()">Move File</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<div class="modal fade" id="removeFileModal" tabindex="-1" role="dialog" aria-labelledby="removeFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="removeFileModalLabel">Remove File</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <span id="remove-file-path-span"></span></p>
+
+                <div id="move-result" style="display: none;">
+                    <h5>Move Result</h5>
+                    <p id="remove-status-span"></p>
+                    <p id="removed-file-span"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal" onclick="remove_file()">Remove File</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<script>
+function prepare_to_move(file_pat) {
+	file_path=file_pat.replace(/\/{2,}/g, "/");
+    $("#file-path-span").text(file_path);
+    $("#destination-input").val("");
+    $("#move-result").hide();
+    $("#fileMoveModal").modal("show");
+}
+
+function prepare_to_remove(file_pat) {
+	file_path=file_pat.replace(/\/{2,}/g, "/");
+    $("#remove-file-path-span").text(file_path);
+    $("#remove-result").hide();
+    $("#removeFileModal").modal("show");
+}
+
+
+
+
+
+function move_file() {
+    var file_path = $("#file-path-span").text();
+    var destination = $("#destination-input").val();
+
+    $.post(
+        "/move",
+        { file: file_path, destination: destination },
+        function (data) {
+            if (data.status === "OK") {
+                $("#status-span").text("Status: " + data.status);
+                $("#newfile-span").text("New file: " + data.newfile);
+            } else {
+                $("#status-span").text("Status: " + data.status);
+                $("#newfile-span").text("Reason: " + data.reason);
+            }
+            $("#move-result").show();
+        },
+        "json"
+    ).fail(function (jqXHR, textStatus, errorThrown) {
+        $("#status-span").text("Status: fail");
+        $("#newfile-span").text("Error: " + textStatus);
+        $("#move-result").show();
+    });
+	search_directory();
+}
+
+
+function remove_file() {
+    var file_path = $("#remove-file-path-span").text();
+    $.post(
+        "/remove",
+        { file: file_path },
+        function (data) {
+            if (data.status === "OK") {
+                $("#remove-status-span").text("Status: " + data.status);
+                $("#removed-file-span").text("Moved to: " + data.newfile);
+            } else {
+                $("#status-span").text("Status: " + data.status);
+                $("#removed-file-span").text("Reason: " + data.reason);
+            }
+            $("#remove-result").show();
+        },
+        "json"
+    ).fail(function (jqXHR, textStatus, errorThrown) {
+        $("#remove-status-span").text("Status: fail");
+        $("#removed-file-span").text("Error: " + textStatus);
+        $("#remove-result").show();
+	search_directory();
+    }).success(function(){
+	search_directory();
+
+    });
+}
+
+
+
+
+
+
+
+
+</script>
+    <div class="modal fade" id="settingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog settingsModal-dialog" role="document">
+            <div class="modal-content settingsModal-content">
+                <div class="modal-header settingsModal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="settingsModalSourceDirectory">Source directory</label>
+                            <input type="text" class="form-control" id="settingsModalSourceDirectory" value="/mnt">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsModalGarbageDirectory">Garbage directory</label>
+                            <input type="text" class="form-control" id="settingsModalGarbageDirectory" value="/mnt/deleted">
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" class="form-check-input" id="settingsModalAllowRegister" checked>
+                            <label class="form-check-label" for="settingsModalAllowRegister">Allow register</label>
+                        </div>
+
+
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="settingsModalClose()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="settingsModalUpdateSettings()">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function settingsModalUpdateSettings() {
+            const sourceDirectory = document.getElementById('settingsModalSourceDirectory').value;
+            const garbageDirectory = document.getElementById('settingsModalGarbageDirectory').value;
+            const allowRegister = document.getElementById('settingsModalAllowRegister').checked;
+
+            console.log('Source Directory:', sourceDirectory);
+            console.log('Garbage Directory:', garbageDirectory);
+            console.log('Allow Register:', allowRegister);
+
+
+	    $.post("/settings", { 'action': 'update','source_path': sourceDirectory,'deleted_path':garbageDirectory,'allow_register':allowRegister })
+
+	    .done(function(response) {
+		alert(JSON.stringify(response));
+	    });
+            settingsModalClose();
+        }
+
+        function settingsModalClose() {
+            $('#settingsModal').modal('hide');
+        }
+
+
+
+
+
+function showretain(){
+
+	if ($('#showretain').hasClass('btn-success')){
+	$('#showretain').removeClass('btn-success');
+	$('#showretain').addClass('btn-light');
+	} else {
+	$('#showretain').addClass('btn-success');
+	$('#showretain').removeClass('btn-light');
+
+	}
+	search_directory();
+
+}
+
+
+
+
+    </script>
+
+
+
+	<a id='lastupdate' style='display:none'>0</a>
+	<a id='normalpath' style='display:none'></a>
+	<a id='trashpath' style='display:none'></a>
+	<a id='querytimeout' style='display:none'>5000</a>
+
+
+</body>
+</html>
+

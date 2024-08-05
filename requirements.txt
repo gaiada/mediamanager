@@ -1,0 +1,4 @@
+Flask
+Pillow
+mysql-connector-python
+Werkzeug
